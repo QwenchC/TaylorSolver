@@ -2,9 +2,11 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.figure as mfigure
 import numpy as np
-import sympy as sp
 from taylor_solver import TaylorSolver
+import sympy as sp
+from sympy.parsing.sympy_parser import parse_expr
 
 class TaylorSolverGUI:
     def __init__(self, root):
@@ -17,14 +19,35 @@ class TaylorSolverGUI:
         self.create_widgets()
         
     def create_widgets(self):
+        # 主框架分为左右两部分
+        main_frame = ttk.Frame(self.root, padding="5")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 左侧输入区域
+        left_frame = ttk.Frame(main_frame, padding="5")
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # 右侧上部LaTeX显示区域
+        right_top_frame = ttk.LabelFrame(main_frame, text="函数公式预览", padding="10")
+        right_top_frame.pack(side=tk.TOP, fill=tk.X, pady=5)
+        
+        # 创建LaTeX预览面板
+        self.latex_fig = mfigure.Figure(figsize=(4, 2), dpi=100)
+        self.latex_ax = self.latex_fig.add_subplot(111)
+        self.latex_canvas = FigureCanvasTkAgg(self.latex_fig, right_top_frame)
+        self.latex_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        self.latex_ax.axis('off')  # 隐藏坐标轴
+        
         # 顶部输入框架
-        input_frame = ttk.Frame(self.root, padding="10")
+        input_frame = ttk.Frame(left_frame, padding="10")
         input_frame.pack(fill=tk.X)
         
         # 函数输入
         ttk.Label(input_frame, text="函数:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
         self.func_var = tk.StringVar()
-        ttk.Entry(input_frame, textvariable=self.func_var, width=30).grid(row=0, column=1, padx=5, pady=5)
+        self.func_entry = ttk.Entry(input_frame, textvariable=self.func_var, width=30)
+        self.func_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.func_entry.bind("<KeyRelease>", self.update_latex_preview)
         ttk.Label(input_frame, text="(例如: sin(x), x**2, exp(x))").grid(row=0, column=2, sticky=tk.W, padx=5, pady=5)
         
         # 展开点
@@ -42,7 +65,7 @@ class TaylorSolverGUI:
         self.eval_var = tk.StringVar(value="1")
         ttk.Entry(input_frame, textvariable=self.eval_var, width=10).grid(row=3, column=1, sticky=tk.W, padx=5, pady=5)
         
-        # 余项类型选择
+        # 余项类型
         ttk.Label(input_frame, text="余项类型:").grid(row=4, column=0, sticky=tk.W, padx=5, pady=5)
         self.remainder_type_var = tk.StringVar(value="lagrange")
         remainder_types = ttk.Combobox(input_frame, textvariable=self.remainder_type_var, width=15)
@@ -51,16 +74,16 @@ class TaylorSolverGUI:
         ttk.Label(input_frame, text="(拉格朗日、柯西、积分、佩亚诺)").grid(row=4, column=2, sticky=tk.W, padx=5, pady=5)
         
         # 按钮
-        button_frame = ttk.Frame(self.root, padding="10")
+        button_frame = ttk.Frame(left_frame, padding="10")
         button_frame.pack(fill=tk.X)
         
         ttk.Button(button_frame, text="计算泰勒展开", command=self.calculate).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="绘制比较图", command=self.plot).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="清除", command=self.clear).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="余项分析", command=self.analyze_remainder).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="清除", command=self.clear).pack(side=tk.LEFT, padx=5)
         
         # 结果显示区
-        result_frame = ttk.LabelFrame(self.root, text="结果", padding="10")
+        result_frame = ttk.LabelFrame(left_frame, text="结果", padding="10")
         result_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # 文本结果
@@ -71,6 +94,34 @@ class TaylorSolverGUI:
         self.figure = plt.Figure(figsize=(6, 4), dpi=100)
         self.plot_canvas = FigureCanvasTkAgg(self.figure, result_frame)
         self.plot_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        
+        # 初始化LaTeX预览
+        self.update_latex_preview()
+    
+    def update_latex_preview(self, event=None):
+        """更新LaTeX公式预览"""
+        try:
+            func_str = self.func_var.get().strip()
+            if not func_str:
+                self.display_latex("f(x) = ?")
+                return
+                
+            # 尝试解析函数
+            expr = parse_expr(func_str)
+            latex_str = sp.latex(expr)
+            self.display_latex(f"f(x) = {latex_str}")
+        except Exception as e:
+            self.display_latex("f(x) = ?")
+    
+    def display_latex(self, latex_str):
+        """在面板上显示LaTeX公式"""
+        self.latex_ax.clear()
+        self.latex_ax.axis('off')
+        self.latex_ax.text(0.5, 0.5, f"${latex_str}$", 
+                          fontsize=14, ha='center', va='center',
+                          transform=self.latex_ax.transAxes)
+        self.latex_fig.tight_layout()
+        self.latex_canvas.draw()
     
     def calculate(self):
         try:
@@ -162,7 +213,8 @@ class TaylorSolverGUI:
         self.result_text.delete(1.0, tk.END)
         self.figure.clear()
         self.plot_canvas.draw()
-
+        self.update_latex_preview()
+    
     def analyze_remainder(self):
         try:
             # 获取输入
