@@ -29,7 +29,7 @@ TaylorSolver 是一个功能强大的泰勒展开公式计算与分析工具，�
 
 1. 克隆或下载本仓库
    ```
-   git clone https://github.com/yourusername/TaylorSolver.git
+   git clone https://github.com/QwenchC/TaylorSolver.git
    cd TaylorSolver
    ```
 
